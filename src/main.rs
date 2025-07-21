@@ -1,160 +1,242 @@
 use serenity::{
+    all::{
+        ChannelId, Client, Command, CommandInteraction, Context, EventHandler, GatewayIntents,
+        Interaction, Ready,
+    },
     async_trait,
-    model::{channel::Message, gateway::Ready, id::ChannelId},
-    prelude::*,
+    builder::{CreateCommand, CreateInteractionResponseFollowup},
 };
-use dotenvy::dotenv;
-use std::{collections::HashSet, env, sync::Arc};
 
+use dotenvy::dotenv;
+use std::{
+    collections::HashSet,
+    env,
+    sync::Arc,
+    time::{SystemTime, UNIX_EPOCH},
+};
+
+use feed_rs::parser;
 use once_cell::sync::Lazy;
+use rand::rngs::StdRng;
+use rand::{SeedableRng, seq::SliceRandom};
 use rand_chacha::ChaCha20Rng;
-use rand::SeedableRng;
-use rand::seq::SliceRandom;
-use rss::Channel;
+use reqwest;
 use tokio::sync::Mutex;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 static FEEDS: Lazy<Arc<Mutex<Vec<(ChannelId, String)>>>> = Lazy::new(|| {
     Arc::new(Mutex::new(vec![
-        (ChannelId::new(1396030037362216980), "https://qiita.com/tags/python/feed".to_string()), // python
-        (ChannelId::new(1396051371580461148), "https://zenn.dev/topics/scratch/feed".to_string()), // scratch
+        (
+            ChannelId::new(1396030037362216980),
+            "https://qiita.com/tags/python/feed".to_string(),
+        ),
+        (
+            ChannelId::new(1396051371580461148),
+            "https://zenn.dev/topics/scratch/feed".to_string(),
+        ),
     ]))
 });
 
-static POSTED_URLS: Lazy<Arc<Mutex<HashSet<String>>>> = Lazy::new(|| {
-    Arc::new(Mutex::new(HashSet::new()))
-});
+static POSTED_URLS: Lazy<Arc<Mutex<HashSet<String>>>> =
+    Lazy::new(|| Arc::new(Mutex::new(HashSet::new())));
 
 struct Handler;
 
 #[async_trait]
 impl EventHandler for Handler {
-    async fn message(&self, ctx: Context, msg: Message) {
-        if msg.content == "!ping" {
-            if let Err(why) = msg.channel_id.say(&ctx.http, "Pong!").await {
-                eprintln!("エラー: {:?}", why);
+    async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
+        if let Some(command) = interaction.command() {
+            match command.data.name.as_str() {
+                "rss" => {
+                    handle_rss_command(&ctx, &command).await;
+                }
+                "rss-random" => {
+                    handle_rss_random_command(&ctx, &command).await;
+                }
+                _ => {}
             }
-            return;
-        }
-
-        // !rss → 今のチャンネルに最新記事を投稿
-        if msg.content == "!rss" {
-            let channel_id = msg.channel_id;
-
-            // フィードを登録済みからランダムに選択
-            let (feed_url, ) = {
-                let feeds = FEEDS.lock().await;
-                if feeds.is_empty() {
-                    let _ = channel_id.say(&ctx.http, "RSSフィードが登録されていません").await;
-                    return;
-                }
-                // ランダムに1つだけURLを選ぶ（チャンネルは無視）
-                let urls: Vec<String> = feeds.iter().map(|(_, url)| url.clone()).collect();
-                let mut rng = {
-                    let duration_since_epoch = SystemTime::now()
-                        .duration_since(UNIX_EPOCH)
-                        .unwrap();
-                    ChaCha20Rng::seed_from_u64(duration_since_epoch.as_secs())
-                };
-                match urls.choose(&mut rng) {
-                    Some(url) => (url.clone(),),
-                    None => {
-                        let _ = channel_id.say(&ctx.http, "RSSフィードが登録されていません").await;
-                        return;
-                    }
-                }
-            };
-
-            // 以下は共通処理
-            send_rss_article(&ctx, channel_id, feed_url.clone()).await;
-            return;
-        }
-
-        // !rss-random → ランダムなチャンネルに最新記事を投稿
-        if msg.content == "!rss-random" {
-            // チャンネルとURLのペアをランダム選択
-            let (channel_id, url) = {
-                let feeds = FEEDS.lock().await;
-                if feeds.is_empty() {
-                    let _ = msg.channel_id.say(&ctx.http, "RSSフィードが登録されていません").await;
-                    return;
-                }
-                let mut rng = {
-                    let duration_since_epoch = SystemTime::now()
-                        .duration_since(UNIX_EPOCH)
-                        .unwrap();
-                    ChaCha20Rng::seed_from_u64(duration_since_epoch.as_secs())
-                };
-                match feeds.choose(&mut rng) {
-                    Some(pair) => (pair.0.clone(), pair.1.clone()),
-                    None => {
-                        let _ = msg.channel_id.say(&ctx.http, "RSSフィードが登録されていません").await;
-                        return;
-                    }
-                }
-            };
-
-            send_rss_article(&ctx, channel_id, url).await;
-            return;
         }
     }
 
-    async fn ready(&self, _: Context, ready: Ready) {
+    async fn ready(&self, ctx: Context, ready: Ready) {
         println!("{} としてログイン完了！", ready.user.name);
+
+        // Vec<CreateCommand> を直接作って渡します
+        let builders = vec![
+            CreateCommand::new("rss").description("チャンネルのRSSを投稿します"),
+            CreateCommand::new("rss-random").description("ランダムにRSSを投稿します"),
+        ];
+
+        // serenity::all::Command を使って登録
+        let commands = Command::set_global_commands(&ctx.http, builders).await;
+
+        match commands {
+            Ok(cmds) => println!("スラッシュコマンド登録完了: {:?}", cmds),
+            Err(why) => eprintln!("スラッシュコマンド登録失敗: {:?}", why),
+        }
     }
 }
 
-/// RSSフィードから最新記事を取り出して指定チャンネルに投稿する関数
-async fn send_rss_article(ctx: &Context, channel_id: ChannelId, url: String) {
-    let resp = match reqwest::get(&url).await {
-        Ok(r) => r,
-        Err(_) => {
-            let _ = channel_id.say(&ctx.http, "RSSの取得に失敗しました").await;
-            return;
-        }
-    };
-
-    let text = match resp.text().await {
-        Ok(t) => t,
-        Err(_) => return,
-    };
-
-    let channel = match Channel::read_from(text.as_bytes()) {
-        Ok(c) => c,
-        Err(_) => return,
-    };
-
-    let item = match channel.items().first() {
-        Some(i) => i,
-        None => {
-            let _ = channel_id.say(&ctx.http, "記事がありませんでした").await;
-            return;
-        }
-    };
-
-    let link = match item.link() {
-        Some(l) => l,
-        None => return,
-    };
-
-    // 投稿済みチェック
-    let already_posted = {
-        let posted = POSTED_URLS.lock().await;
-        posted.contains(link)
-    };
-
-    if already_posted {
-        let _ = channel_id.say(&ctx.http, "（すでに投稿済みの記事です）").await;
+async fn handle_rss_command(ctx: &Context, command: &CommandInteraction) {
+    if let Err(why) = command.defer_ephemeral(&ctx.http).await {
+        eprintln!("deferエラー: {:?}", why);
         return;
     }
 
-    // 投稿済みセットに追加
-    {
-        let mut posted = POSTED_URLS.lock().await;
-        posted.insert(link.to_string());
+    let channel_id = command.channel_id;
+
+    let feed_url = {
+        let feeds = FEEDS.lock().await;
+        feeds
+            .iter()
+            .find(|(id, _)| *id == channel_id)
+            .map(|(_, url)| url.clone())
+    };
+
+    let feed_url = match feed_url {
+        Some(url) => url,
+        None => {
+            let _ = command
+                .create_followup(
+                    &ctx.http,
+                    (|m: CreateInteractionResponseFollowup| -> CreateInteractionResponseFollowup {
+                        m.content("このチャンネルに紐づくRSSフィードが登録されていません。")
+                            .ephemeral(true)
+                    })(CreateInteractionResponseFollowup::default()),
+                ) // ←ここでクロージャを呼び出して値を作る
+                .await;
+            return;
+        }
+    };
+
+    match fetch_and_post_rss(ctx, channel_id, &feed_url).await {
+        Ok(_) => {
+            let _ = command
+                .create_followup(
+                    &ctx.http,
+                    (|m: CreateInteractionResponseFollowup| -> CreateInteractionResponseFollowup {
+                        m.content("RSS記事を投稿しました。").ephemeral(true)
+                    })(CreateInteractionResponseFollowup::default()),
+                ) // ←ここでクロージャを呼び出して値を作る
+                .await;
+        }
+        Err(e) => {
+            let _ = command
+                .create_followup(
+                    &ctx.http,
+                    (|m: CreateInteractionResponseFollowup| -> CreateInteractionResponseFollowup {
+                        m.content(format!("RSS取得中にエラーが発生しました: {}", e))
+                            .ephemeral(true)
+                    })(CreateInteractionResponseFollowup::default()),
+                )
+                .await;
+        }
+    }
+}
+
+async fn handle_rss_random_command(ctx: &Context, command: &CommandInteraction) {
+    if let Err(why) = command.defer_ephemeral(&ctx.http).await {
+        eprintln!("deferエラー: {:?}", why);
+        return;
     }
 
-    let _ = channel_id.say(&ctx.http, format!("新着記事: {}", link)).await;
+    let (channel_id, feed_url) = {
+        let feeds = FEEDS.lock().await;
+        let mut rng = {
+            let duration_since_epoch = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+            ChaCha20Rng::seed_from_u64(duration_since_epoch.as_secs())
+        };
+        match feeds.choose(&mut rng) {
+            Some((id, url)) => (id.clone(), url.clone()),
+            None => {
+                let _ = command
+                .create_followup(
+                    &ctx.http,
+                    (|m: CreateInteractionResponseFollowup| -> CreateInteractionResponseFollowup {
+                        m.content("RSSフィードが登録されていません。").ephemeral(true)
+                    })(CreateInteractionResponseFollowup::default()),
+                ) // ←ここでクロージャを呼び出して値を作る
+                .await;
+                return;
+            }
+        }
+    };
+
+    match fetch_and_post_rss(ctx, channel_id, &feed_url).await {
+        Ok(_) => {
+            let _ = command
+                .create_followup(
+                    &ctx.http,
+                    (|m: CreateInteractionResponseFollowup| -> CreateInteractionResponseFollowup {
+                        m.content("RSS記事を投稿しました。").ephemeral(true)
+                    })(CreateInteractionResponseFollowup::default()),
+                ) // ←ここでクロージャを呼び出して値を作る
+                .await;
+        }
+        Err(e) => {
+            let _ = command
+                .create_followup(
+                    &ctx.http,
+                    (|m: CreateInteractionResponseFollowup| -> CreateInteractionResponseFollowup {
+                        m.content(format!("RSS取得中にエラーが発生しました: {}", e))
+                            .ephemeral(true)
+                    })(CreateInteractionResponseFollowup::default()),
+                ) // ←ここでクロージャを呼び出して値を作る
+                .await;
+        }
+    }
+}
+
+async fn fetch_and_post_rss(
+    ctx: &Context,
+    channel_id: ChannelId,
+    feed_url: &str,
+) -> Result<(), String> {
+    let client = reqwest::Client::builder()
+        .user_agent("Mozilla/5.0 (compatible; MyRustBot/1.0)")
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let resp = client
+        .get(feed_url)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    let text = resp.text().await.map_err(|e| e.to_string())?;
+
+    let feed = parser::parse(text.as_bytes()).map_err(|e| e.to_string())?;
+
+    // 記事が存在するか確認
+    if feed.entries.is_empty() {
+        return Err("記事がありません".to_string());
+    }
+
+    // ランダムに選ぶ（スレッド安全な乱数生成器を使用）
+    let mut rng = StdRng::from_entropy();
+    let entry = feed
+        .entries
+        .choose(&mut rng)
+        .ok_or("記事が選べませんでした")?;
+    let link = entry
+        .links
+        .first()
+        .ok_or("リンクがありません")?
+        .href
+        .clone();
+
+    {
+        let mut posted = POSTED_URLS.lock().await;
+        if posted.contains(&link) {
+            return Err("（すでに投稿済みの記事です）".to_string());
+        }
+        posted.insert(link.clone());
+    }
+
+    channel_id
+        .say(&ctx.http, format!("新着記事: {}", link))
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
 }
 
 #[tokio::main]
