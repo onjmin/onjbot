@@ -3,7 +3,7 @@ use serenity::all::{CommandInteraction, Context};
 use serenity::all::{CreateInteractionResponse, CreateInteractionResponseMessage};
 
 pub async fn handle_chat_command(ctx: &Context, command: &CommandInteraction, user_input: &str) {
-    match talk_to_llama(user_input) {
+    match talk_to_llama(user_input).await {
         Ok(response) => {
             let _ = command
                 .create_response(

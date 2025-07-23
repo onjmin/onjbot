@@ -1118,6 +1118,7 @@ dependencies = [
  "rand_chacha",
  "reqwest",
  "rss",
+ "serde",
  "serenity",
  "tokio",
 ]
