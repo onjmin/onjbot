@@ -1,5 +1,6 @@
 mod commands;
 mod handler;
+mod llm;
 mod rss;
 mod state;
 
