@@ -29,7 +29,7 @@ pub async fn handle_rss_random_command(ctx: &Context, command: &CommandInteracti
                         m.content("RSSフィードが登録されていません。")
                             .ephemeral(true)
                     })(CreateInteractionResponseFollowup::default()),
-                ) // ←ここでクロージャを呼び出して値を作る
+                )
                 .await;
                 return;
             }
@@ -44,7 +44,7 @@ pub async fn handle_rss_random_command(ctx: &Context, command: &CommandInteracti
                     (|m: CreateInteractionResponseFollowup| -> CreateInteractionResponseFollowup {
                         m.content("RSS記事を投稿しました。").ephemeral(true)
                     })(CreateInteractionResponseFollowup::default()),
-                ) // ←ここでクロージャを呼び出して値を作る
+                )
                 .await;
         }
         Err(e) => {
@@ -55,7 +55,7 @@ pub async fn handle_rss_random_command(ctx: &Context, command: &CommandInteracti
                         m.content(format!("RSS取得中にエラーが発生しました: {}", e))
                             .ephemeral(true)
                     })(CreateInteractionResponseFollowup::default()),
-                ) // ←ここでクロージャを呼び出して値を作る
+                )
                 .await;
         }
     }
