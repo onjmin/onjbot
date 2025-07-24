@@ -1,14 +1,19 @@
+use crate::commands::{
+    chat::handle_message_ai_command, rss::handle_rss_command, rss_random::handle_rss_random_command,
+};
 use serenity::builder::{CreateInteractionResponse, CreateInteractionResponseMessage};
 use serenity::{
     all::{Command, Context, CreateCommand, EventHandler, Interaction, Message, Ready},
     async_trait,
 };
-
-use crate::commands::{
-    chat::handle_message_ai_command, rss::handle_rss_command, rss_random::handle_rss_random_command,
-};
-
 pub struct Handler;
+use once_cell::sync::Lazy;
+use once_cell::sync::OnceCell;
+use serenity::model::id::UserId;
+use std::sync::Mutex;
+
+static ZENRES_STATE: Lazy<Mutex<bool>> = Lazy::new(|| Mutex::new(false));
+static BOT_USER_ID: OnceCell<UserId> = OnceCell::new();
 
 #[async_trait]
 impl EventHandler for Handler {
@@ -28,36 +33,58 @@ impl EventHandler for Handler {
                 "rss-random" => {
                     handle_rss_random_command(&ctx, &command).await;
                 }
+                "zenres" => {
+                    let status = {
+                        let mut state = ZENRES_STATE.lock().unwrap();
+                        *state = !*state;
+                        if *state { "ON" } else { "OFF" }.to_string()
+                    };
+
+                    let builder = CreateInteractionResponse::Message(
+                        CreateInteractionResponseMessage::new()
+                            .content(format!("全レスモード: {}", status)),
+                    );
+                    let _ = command.create_response(&ctx.http, builder).await;
+                }
                 _ => {}
             }
         }
     }
 
     async fn message(&self, ctx: Context, msg: Message) {
-        // Bot自身のメッセージは無視
-        if msg.author.bot {
-            return;
+        // 自分自身のメッセージだけ無視する
+        if let Some(my_id) = BOT_USER_ID.get() {
+            if msg.author.id == *my_id {
+                return;
+            }
         }
 
-        // メッセージが "!ai" で始まる（後にスペースや改行含む）
-        if msg.content.starts_with("!ai") {
-            // "!ai" の部分を取り除き、前後の空白と改行をトリムする
+        let zenres = *ZENRES_STATE.lock().unwrap();
+
+        if zenres {
+            let content = msg
+                .content
+                .strip_prefix("!ai")
+                .map(str::trim)
+                .unwrap_or_else(|| msg.content.trim());
+
+            handle_message_ai_command(&ctx, &msg, content).await;
+        } else if msg.content.starts_with("!ai") {
             let user_input = msg.content["!ai".len()..].trim();
-
-            // メッセージ内の改行や複数行もそのまま user_input に含まれる
-
-            // 応答でメンションを飛ばすようにハンドラー呼び出し
             handle_message_ai_command(&ctx, &msg, user_input).await;
         }
     }
 
     async fn ready(&self, ctx: Context, ready: Ready) {
         println!("{} としてログイン完了！", ready.user.name);
+        BOT_USER_ID.set(ready.user.id).ok();
 
         let builders = vec![
             CreateCommand::new("ping").description("Botが動いているか確認します"),
             CreateCommand::new("rss").description("チャンネルのRSSフィードを投稿します"),
             CreateCommand::new("rss-random").description("ランダムにRSSフィードを投稿します"),
+            CreateCommand::new("zenres")
+                .description("全てのメッセージに反応するモードに切り替えます"),
         ];
 
         let commands = Command::set_global_commands(&ctx.http, builders).await;

@@ -1,9 +1,11 @@
 use serenity::all::{Context, Message};
 
 pub async fn handle_message_ai_command(ctx: &Context, msg: &Message, user_input: &str) {
+    // タイピングインジケータを開始（dropされるまで続く）
+    let typing = msg.channel_id.start_typing(&ctx.http);
+
     match crate::llm::talk_to_llama(user_input).await {
         Ok(response) => {
-            // メンションを付けて返信
             let content = format!("<@{}> {}", msg.author.id, response);
             let _ = msg.channel_id.say(&ctx.http, content).await;
         }
@@ -12,4 +14,7 @@ pub async fn handle_message_ai_command(ctx: &Context, msg: &Message, user_input:
             let _ = msg.channel_id.say(&ctx.http, content).await;
         }
     }
+
+    // typingはスコープを抜けたときに自動で止まります（Drop実装）
+    drop(typing); // 明示的に書いてもOK（なくてもOK）
 }
