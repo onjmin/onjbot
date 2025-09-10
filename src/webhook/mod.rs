@@ -1,6 +1,7 @@
 // src/webhook/mod.rs
 
 pub mod ai;
+pub mod beep;
 pub mod image_gen;
 
 use serenity::model::prelude::Message;
@@ -56,7 +57,11 @@ pub async fn handle_webhook_message(ctx: &Context, msg: &Message) {
     }
 
     // 検証成功後、入力テキストに基づいて振り分け
-    if input.starts_with("!ai") {
+    if input.starts_with("!beep") {
+        if let Err(e) = beep::handle_beep_webhook(ctx, msg, &lines[2], &lines[3], &input).await {
+            eprintln!("beep Webhookの処理中にエラー: {}", e);
+        }
+    } else if input.starts_with("!ai") {
         if let Err(e) = ai::handle_ai_webhook(ctx, msg, &lines[2], &lines[3], &input).await {
             eprintln!("AI Webhookの処理中にエラー: {}", e);
         }
