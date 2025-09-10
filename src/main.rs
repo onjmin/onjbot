@@ -3,6 +3,7 @@ mod handler;
 mod llm;
 mod rss;
 mod state;
+mod webhook;
 
 use dotenvy::dotenv;
 use serenity::all::{Client, GatewayIntents};

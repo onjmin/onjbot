@@ -27,6 +27,13 @@
 
 - `!ai` — Botと会話できます（内部でローカルLLMのtext-generation-webui APIを使用）
 
+### 起動コマンド
+
+```sh
+cargo build
+cargo run
+```
+
 ## ライセンス
 
 - AGPL-3.0

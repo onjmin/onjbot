@@ -1,6 +1,7 @@
 use crate::commands::{
     chat::handle_message_ai_command, rss::handle_rss_command, rss_random::handle_rss_random_command,
 };
+use crate::webhook;
 use serenity::builder::{CreateInteractionResponse, CreateInteractionResponseMessage};
 use serenity::{
     all::{Command, Context, CreateCommand, EventHandler, Interaction, Message, Ready},
@@ -14,6 +15,18 @@ use std::sync::Mutex;
 
 static ZENRES_STATE: Lazy<Mutex<bool>> = Lazy::new(|| Mutex::new(false));
 static BOT_USER_ID: OnceCell<UserId> = OnceCell::new();
+
+use serenity::model::id::ChannelId;
+use std::env;
+
+static TARGET_CHANNEL_ID: Lazy<ChannelId> = Lazy::new(|| {
+    let channel_id_str = env::var("UNJ_AI_WEBHOOK_CHANNEL_ID")
+        .expect("UNJ_AI_WEBHOOK_CHANNEL_ID が環境変数にありません");
+    let channel_id_u64 = channel_id_str
+        .parse::<u64>()
+        .expect("UNJ_AI_WEBHOOK_CHANNEL_ID の値が不正な数値です");
+    ChannelId::new(channel_id_u64)
+});
 
 #[async_trait]
 impl EventHandler for Handler {
@@ -59,6 +72,7 @@ impl EventHandler for Handler {
             }
         }
 
+        // 全レスモード
         let zenres = *ZENRES_STATE.lock().unwrap();
 
         if zenres {
@@ -72,6 +86,11 @@ impl EventHandler for Handler {
         } else if msg.content.starts_with("!ai") {
             let user_input = msg.content["!ai".len()..].trim();
             handle_message_ai_command(&ctx, &msg, user_input).await;
+        }
+
+        // うんJ AI Webhook監視
+        if msg.channel_id == *TARGET_CHANNEL_ID {
+            webhook::handle_webhook_message(&ctx, &msg).await;
         }
     }
 
