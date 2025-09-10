@@ -13,9 +13,9 @@ use std::env;
 
 lazy_static! {
     // lazy_staticで定義されたグローバル変数は、String型への参照として扱われます
-    pub static ref VITE_UNJ_AI_WEBHOOK_SECRET_PEPPER: String = {
-        env::var("VITE_UNJ_AI_WEBHOOK_SECRET_PEPPER")
-            .expect("VITE_UNJ_AI_WEBHOOK_SECRET_PEPPER must be set")
+    pub static ref UNJ_AI_WEBHOOK_SECRET_PEPPER: String = {
+        env::var("UNJ_AI_WEBHOOK_SECRET_PEPPER")
+            .expect("UNJ_AI_WEBHOOK_SECRET_PEPPER must be set")
     };
 }
 
@@ -82,7 +82,7 @@ fn verify_hash(received_hash: &str, input: &str) -> bool {
     // ここを修正します。`*`で参照を外して、String型を渡します。
     let combined_string = format!(
         "{}{}{}",
-        *VITE_UNJ_AI_WEBHOOK_SECRET_PEPPER, delimiter, first_hash_str
+        *UNJ_AI_WEBHOOK_SECRET_PEPPER, delimiter, first_hash_str
     );
 
     hasher.update(combined_string.as_bytes());
