@@ -31,7 +31,7 @@ pub async fn post_res(body: &ApiMessage<'_>) -> Result<(), Box<dyn StdError + Se
     let api_key = env::var("UNJ_ADMIN_API_KEY").expect("UNJ_ADMIN_API_KEY must be set");
 
     let client = Client::new();
-    let url = format!("{}/api/admin/thread/res", api_endpoint);
+    let url = format!("{}api/admin/thread/res", api_endpoint);
 
     let response = client
         .post(&url)
