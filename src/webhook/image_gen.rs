@@ -16,12 +16,12 @@ pub async fn handle_image_gen_webhook(
     ctx: &Context,
     msg: &Message,
     thread_id: &str,
-    res_count: &str,
+    res_num: &str,
     input: &str,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     println!("画像生成 Webhookを受信しました。");
     println!("  スレッドID: {}", thread_id);
-    println!("  レス番号: {}", res_count);
+    println!("  レス番号: {}", res_num);
     println!("  入力テキスト: {}", input);
 
     // TODO: ここに実際の画像生成ロジックを実装します
