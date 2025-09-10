@@ -56,8 +56,12 @@ pub async fn handle_webhook_message(ctx: &Context, msg: &Message) {
         return;
     }
 
-    // 検証成功後、入力テキストに基づいて振り分け
+    // 検証成功後、コマンドをパースして振り分け
     if input.starts_with("!beep") {
+        // 処理開始を示す✅リアクションを追加
+        if let Err(why) = msg.react(&ctx.http, '✅').await {
+            eprintln!("リアクションを追加できませんでした: {:?}", why);
+        }
         let cleaned_input = input.strip_prefix("!beep").unwrap_or(&input).trim();
         if let Err(e) =
             beep::handle_beep_webhook(ctx, msg, &lines[2], &lines[3], cleaned_input).await
@@ -65,11 +69,22 @@ pub async fn handle_webhook_message(ctx: &Context, msg: &Message) {
             eprintln!("beep Webhookの処理中にエラー: {}", e);
         }
     } else if input.starts_with("!ai") {
+        // 処理開始を示す🤖リアクションを追加
+        if let Err(why) = msg.react(&ctx.http, '🤖').await {
+            eprintln!("リアクションを追加できませんでした: {:?}", why);
+        }
         let cleaned_input = input.strip_prefix("!ai").unwrap_or(&input).trim();
         if let Err(e) = ai::handle_ai_webhook(ctx, msg, &lines[2], &lines[3], cleaned_input).await {
             eprintln!("AI Webhookの処理中にエラー: {}", e);
         }
     } else if input.starts_with("!gen") {
+        // 処理開始を示す🎨リアクションを追加
+        if let Err(why) = msg
+            .react(&ctx.http, ReactionType::Unicode("🎨".to_string()))
+            .await
+        {
+            eprintln!("リアクションを追加できませんでした: {:?}", why);
+        }
         let cleaned_input = input.strip_prefix("!gen").unwrap_or(&input).trim();
         if let Err(e) =
             image_gen::handle_image_gen_webhook(ctx, msg, &lines[2], &lines[3], cleaned_input).await

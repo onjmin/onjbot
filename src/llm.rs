@@ -47,7 +47,7 @@ pub async fn talk_to_llama(
             content: user_prompt.to_string(),
         }],
         mode: "chat-instruct".to_string(),
-        character: "解音ゼロ（ときねゼロ）".to_string(),
+        character: "解音ゼロv2".to_string(),
         temperature: 0.6,
         top_p: 0.95,
         top_k: 20,

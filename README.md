@@ -34,6 +34,10 @@ cargo build
 cargo run
 ```
 
+```
+.\start_windows.bat --api
+```
+
 ## ライセンス
 
 - AGPL-3.0
