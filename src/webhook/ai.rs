@@ -18,9 +18,6 @@ pub async fn handle_ai_webhook(
     // LLMに問い合わせ、結果を処理
     match crate::llm::talk_to_llm(input).await {
         Ok(response) => {
-            // LLMの応答を整形
-            let content_text = format!(">>{}\n{}", res_num, response);
-
             // APIに結果をPOST
             let api_message = ApiMessage {
                 thread_id,
@@ -28,7 +25,7 @@ pub async fn handle_ai_webhook(
                 cc_user_name: "解音ゼロ",
                 cc_user_avatar: 102,
                 content_type: 1,
-                content_text: &content_text,
+                content_text: &format!(">>{}\n{}", res_num, response),
                 content_url: "",
             };
 

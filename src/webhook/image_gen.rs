@@ -35,7 +35,7 @@ pub async fn handle_image_gen_webhook(
                                 cc_user_name: "★AI",
                                 cc_user_avatar: 0,
                                 content_type: 4,
-                                content_text: "",
+                                content_text: &format!(">>{}", res_num),
                                 content_url: &image_url,
                             };
 
