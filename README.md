@@ -50,12 +50,21 @@ cargo run
 #### gen
 
 webui-user.bat
+
 ```
 set COMMANDLINE_ARGS=--listen --server-name 127.0.0.12 --api
 ```
 
 ```
 ./webui-user.bat
+```
+
+#### feeder
+
+※PowerShell
+
+```
+$env:FEEDER_COOKIE='クッキーの値'
 ```
 
 ## ライセンス

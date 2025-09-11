@@ -4,8 +4,8 @@ use std::error::Error;
 
 /// AI関連のWebhookメッセージを処理するハンドラ
 pub async fn handle_ai_webhook(
-    ctx: &Context,
-    msg: &Message,
+    _ctx: &Context,
+    _msg: &Message,
     thread_id: &str,
     res_num: &str,
     input: &str,
@@ -14,9 +14,6 @@ pub async fn handle_ai_webhook(
     println!("  スレッドID: {}", thread_id);
     println!("  レス番号: {}", res_num);
     println!("  入力テキスト: {}", input);
-
-    // タイピングインジケータを開始
-    let typing = msg.channel_id.start_typing(&ctx.http);
 
     // LLMに問い合わせ、結果を処理
     match crate::llm::talk_to_llm(input).await {
@@ -44,9 +41,6 @@ pub async fn handle_ai_webhook(
             eprintln!("LLMの処理中にエラーが発生しました: {}", e);
         }
     }
-
-    // `typing`はスコープを抜けると自動で停止
-    drop(typing);
 
     Ok(())
 }

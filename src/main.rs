@@ -1,4 +1,5 @@
 mod commands;
+mod feeder;
 mod handler;
 mod llm;
 mod rss;
