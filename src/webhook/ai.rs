@@ -19,7 +19,7 @@ pub async fn handle_ai_webhook(
     let typing = msg.channel_id.start_typing(&ctx.http);
 
     // LLMに問い合わせ、結果を処理
-    match crate::llm::talk_to_llama(input).await {
+    match crate::llm::talk_to_llm(input).await {
         Ok(response) => {
             // LLMの応答を整形
             let content_text = format!(">>{}\n{}", res_num, response);

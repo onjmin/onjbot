@@ -21,7 +21,7 @@ pub async fn handle_beep_webhook(
     let boop_message = ApiMessage {
         thread_id,
         cc_user_id: "AI",
-        cc_user_name: "",
+        cc_user_name: "★AI",
         cc_user_avatar: 0,
         content_type: 1,
         content_text: &content_text,

@@ -1,32 +1,29 @@
 use crate::commands::{
-    chat::handle_message_ai_command, rss::handle_rss_command, rss_random::handle_rss_random_command,
+    ai::handle_message_ai_command, image_gen::handle_image_gen_command, rss::handle_rss_command,
+    rss_random::handle_rss_random_command,
 };
 use crate::webhook;
-use serenity::builder::{CreateInteractionResponse, CreateInteractionResponseMessage};
-use serenity::{
-    all::{Command, Context, CreateCommand, EventHandler, Interaction, Message, Ready},
-    async_trait,
-};
-pub struct Handler;
 use once_cell::sync::Lazy;
 use once_cell::sync::OnceCell;
+use serenity::builder::{CreateInteractionResponse, CreateInteractionResponseMessage};
+use serenity::model::id::ChannelId;
 use serenity::model::id::UserId;
+use serenity::{
+    all::{
+        Command, CommandOptionType, Context, CreateCommand, CreateCommandOption, EventHandler,
+        Interaction, Message, Ready,
+    },
+    async_trait,
+};
 use std::sync::Mutex;
+
+// Handler構造体を修正
+pub struct Handler {
+    pub target_channel_id: ChannelId,
+}
 
 static ZENRES_STATE: Lazy<Mutex<bool>> = Lazy::new(|| Mutex::new(false));
 static BOT_USER_ID: OnceCell<UserId> = OnceCell::new();
-
-use serenity::model::id::ChannelId;
-use std::env;
-
-static TARGET_CHANNEL_ID: Lazy<ChannelId> = Lazy::new(|| {
-    let channel_id_str = env::var("UNJ_AI_WEBHOOK_CHANNEL_ID")
-        .expect("UNJ_AI_WEBHOOK_CHANNEL_ID が環境変数にありません");
-    let channel_id_u64 = channel_id_str
-        .parse::<u64>()
-        .expect("UNJ_AI_WEBHOOK_CHANNEL_ID の値が不正な数値です");
-    ChannelId::new(channel_id_u64)
-});
 
 #[async_trait]
 impl EventHandler for Handler {
@@ -45,6 +42,9 @@ impl EventHandler for Handler {
                 }
                 "rss-random" => {
                     handle_rss_random_command(&ctx, &command).await;
+                }
+                "gen" => {
+                    handle_image_gen_command(&ctx, &command).await;
                 }
                 "zenres" => {
                     let status = {
@@ -87,9 +87,8 @@ impl EventHandler for Handler {
             let user_input = msg.content["!ai".len()..].trim();
             handle_message_ai_command(&ctx, &msg, user_input).await;
         }
-
         // うんJ AI Webhook監視
-        if msg.channel_id == *TARGET_CHANNEL_ID {
+        if msg.channel_id == self.target_channel_id {
             webhook::handle_webhook_message(&ctx, &msg).await;
         }
     }
@@ -102,6 +101,16 @@ impl EventHandler for Handler {
             CreateCommand::new("ping").description("Botが動いているか確認します"),
             CreateCommand::new("rss").description("チャンネルのRSSフィードを投稿します"),
             CreateCommand::new("rss-random").description("ランダムにRSSフィードを投稿します"),
+            CreateCommand::new("gen")
+                .description("画像生成します")
+                .add_option(
+                    CreateCommandOption::new(
+                        CommandOptionType::String,
+                        "prompt", // 引数名
+                        "生成したい画像のプロンプト",
+                    )
+                    .required(true), // プロンプトを必須にする
+                ),
             CreateCommand::new("zenres")
                 .description("全てのメッセージに反応するモードに切り替えます"),
         ];

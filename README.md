@@ -29,13 +29,33 @@
 
 ### 起動コマンド
 
+#### onjbot
+
 ```sh
 cargo build
 cargo run
 ```
 
+#### ai
+
 ```
-.\start_windows.bat --api
+./start_windows.bat --listen --listen-host 127.0.0.11
+```
+
+
+```
+./start_windows.bat --listen --listen-host 127.0.0.11 --api --api-port 5001
+```
+
+#### gen
+
+webui-user.bat
+```
+set COMMANDLINE_ARGS=--listen --server-name 127.0.0.12 --api
+```
+
+```
+./webui-user.bat
 ```
 
 ## ライセンス

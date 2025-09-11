@@ -33,11 +33,10 @@ struct ResponseMessage {
     content: String,
 }
 
-pub async fn talk_to_llama(
+pub async fn talk_to_llm(
     user_prompt: &str,
 ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-    let api_url = env::var("LLAMA_API_URL")
-        .unwrap_or_else(|_| "http://127.0.0.1:5000/v1/chat/completions".to_string());
+    let api_url = env::var("LLM_API_URL").expect("LLM_API_URL must be set");
 
     let client = Client::new();
 
