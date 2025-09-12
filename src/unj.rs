@@ -26,12 +26,11 @@ pub struct ApiMessage<'a> {
 
 // 修正後: 構造体の参照を引数として受け取るように変更
 pub async fn post_res(body: &ApiMessage<'_>) -> Result<(), Box<dyn StdError + Send + Sync>> {
-    let api_endpoint =
-        env::var("UNJ_ADMIN_API_ENDPOINT").expect("UNJ_ADMIN_API_ENDPOINT must be set");
+    let api_url = env::var("UNJ_ADMIN_API_URL").expect("UNJ_ADMIN_API_URL must be set");
     let api_key = env::var("UNJ_ADMIN_API_KEY").expect("UNJ_ADMIN_API_KEY must be set");
 
     let client = Client::new();
-    let url = format!("{}api/admin/thread/res", api_endpoint);
+    let url = format!("{}api/admin/thread/res", api_url);
 
     let response = client
         .post(&url)
