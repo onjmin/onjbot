@@ -72,10 +72,15 @@ set COMMANDLINE_ARGS=--listen --server-name 127.0.0.12 --api
 ### feeder
 
 ※PowerShell
+※HttpOnly混合
 
 ```
 $env:FEEDER_COOKIE='クッキーの値'
 ```
+
+### unj
+
+※本番に向いている
 
 ## ライセンス
 

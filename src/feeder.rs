@@ -1,5 +1,3 @@
-// src/post_unj_res.rs
-
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use image::ImageFormat;
