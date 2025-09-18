@@ -46,9 +46,11 @@ pub async fn handle_webhook_message(ctx: &Context, msg: &Message) {
 
     let received_hash = lines[1];
     let nonce = lines[2];
+    let thread_id = lines[3];
+    let res_num = lines[4];
     let input = lines[5..].join("\n");
 
-    if !verify_hash(received_hash, nonce, &input) {
+    if !verify_hash(received_hash, nonce, thread_id, res_num) {
         eprintln!("ハッシュ検証に失敗しました。不正なWebhookの可能性があります。");
         if let Err(why) = msg
             .react(&ctx.http, ReactionType::Unicode("❌".to_string()))
@@ -105,8 +107,7 @@ pub async fn handle_webhook_message(ctx: &Context, msg: &Message) {
             eprintln!("リアクションを追加できませんでした: {:?}", why);
         }
         let cleaned_input = input.strip_prefix("!beep").unwrap_or(&input).trim();
-        if let Err(e) =
-            beep::handle_beep_webhook(ctx, msg, &lines[3], &lines[4], cleaned_input).await
+        if let Err(e) = beep::handle_beep_webhook(ctx, msg, thread_id, res_num, cleaned_input).await
         {
             eprintln!("beep Webhookの処理中にエラー: {}", e);
         }
@@ -115,7 +116,7 @@ pub async fn handle_webhook_message(ctx: &Context, msg: &Message) {
             eprintln!("リアクションを追加できませんでした: {:?}", why);
         }
         let cleaned_input = input.strip_prefix("!ai").unwrap_or(&input).trim();
-        if let Err(e) = ai::handle_ai_webhook(ctx, msg, &lines[3], &lines[4], cleaned_input).await {
+        if let Err(e) = ai::handle_ai_webhook(ctx, msg, thread_id, res_num, cleaned_input).await {
             eprintln!("AI Webhookの処理中にエラー: {}", e);
         }
     } else if input.starts_with("!gen") {
@@ -127,7 +128,7 @@ pub async fn handle_webhook_message(ctx: &Context, msg: &Message) {
         }
         let cleaned_input = input.strip_prefix("!gen").unwrap_or(&input).trim();
         if let Err(e) =
-            image_gen::handle_image_gen_webhook(ctx, msg, &lines[3], &lines[4], cleaned_input).await
+            image_gen::handle_image_gen_webhook(ctx, msg, thread_id, res_num, cleaned_input).await
         {
             eprintln!("画像生成 Webhookの処理中にエラー: {}", e);
         }
@@ -136,14 +137,11 @@ pub async fn handle_webhook_message(ctx: &Context, msg: &Message) {
     }
 }
 
-fn verify_hash(received_hash: &str, nonce: &str, input: &str) -> bool {
-    let input_hash = Sha256::digest(input.as_bytes());
-    let input_hash_str = hex::encode(input_hash);
-
+fn verify_hash(received_hash: &str, nonce: &str, thread_id: &str, res_num: &str) -> bool {
     let delimiter = "###";
     let combined_string = format!(
-        "{}{}{}{}{}",
-        *UNJ_AI_WEBHOOK_SECRET_PEPPER, delimiter, input_hash_str, delimiter, nonce
+        "{}{}{}{}{}{}{}",
+        *UNJ_AI_WEBHOOK_SECRET_PEPPER, delimiter, nonce, delimiter, thread_id, delimiter, res_num
     );
 
     let final_hash = Sha256::digest(combined_string.as_bytes());
