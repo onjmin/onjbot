@@ -73,6 +73,7 @@ set COMMANDLINE_ARGS=--listen --server-name 127.0.0.12 --api
 
 ※PowerShell
 ※HttpOnly混合
+※ルームに戻る & 設定変更
 
 ```
 $env:FEEDER_COOKIE='クッキーの値'
