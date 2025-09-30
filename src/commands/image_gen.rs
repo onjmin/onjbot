@@ -2,7 +2,7 @@ use base64::{Engine as _, engine::general_purpose::STANDARD};
 use serenity::all::{CommandInteraction, Context, ResolvedOption, ResolvedValue};
 use serenity::builder::{CreateAttachment, CreateInteractionResponseFollowup};
 
-pub async fn handle_image_gen_command(ctx: &Context, command: &CommandInteraction) {
+pub async fn handle_slash_image_gen(ctx: &Context, command: &CommandInteraction) {
     // タイムアウトを防ぐため、コマンドを即座に遅延応答させる
     if let Err(why) = command.defer(&ctx.http).await {
         eprintln!("deferエラー: {:?}", why);

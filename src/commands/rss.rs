@@ -3,7 +3,7 @@ use serenity::builder::CreateInteractionResponseFollowup;
 
 use crate::{rss::fetch_and_post_rss, state::FEEDS};
 
-pub async fn handle_rss_command(ctx: &Context, command: &CommandInteraction) {
+pub async fn handle_slash_rss(ctx: &Context, command: &CommandInteraction) {
     if let Err(why) = command.defer_ephemeral(&ctx.http).await {
         eprintln!("deferエラー: {:?}", why);
         return;

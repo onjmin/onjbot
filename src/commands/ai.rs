@@ -1,6 +1,6 @@
 use serenity::all::{Context, Message};
 
-pub async fn handle_message_ai_command(ctx: &Context, msg: &Message, user_input: &str) {
+pub async fn handle_slash_ai(ctx: &Context, msg: &Message, user_input: &str) {
     // タイピングインジケータを開始（dropされるまで続く）
     let typing = msg.channel_id.start_typing(&ctx.http);
 
