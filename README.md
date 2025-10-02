@@ -48,10 +48,6 @@ cargo run
 
 ### ai
 
-```
-./start_windows.bat --listen --listen-host 127.0.0.11
-```
-
 
 ```
 ./start_windows.bat --listen --listen-host 127.0.0.11 --api --api-port 5001
@@ -59,11 +55,13 @@ cargo run
 
 ### gen
 
-webui-user.bat
+webui-user.bat（予めファイルを書き換える）
 
 ```
 set COMMANDLINE_ARGS=--listen --server-name 127.0.0.12 --api
 ```
+
+---
 
 ```
 ./webui-user.bat

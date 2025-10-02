@@ -34,6 +34,12 @@ async fn main() {
         .await
         .expect("Botのクライアント作成に失敗しました");
 
+    tokio::spawn(async {
+        if let Err(e) = feeder::keep_session_alive().await {
+            eprintln!("Session keeper task crashed: {:?}", e);
+        }
+    });
+
     if let Err(why) = client.start().await {
         eprintln!("Bot起動エラー: {:?}", why);
     }

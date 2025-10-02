@@ -6,6 +6,8 @@ use std::env;
 use std::error::Error as StdError;
 use std::error::Error;
 use std::io::Cursor;
+use std::time::Duration;
+use tokio::time;
 
 use std::fs::{self, OpenOptions};
 use std::io::Write;
@@ -100,4 +102,46 @@ pub async fn get_image_url(picture_id: &str) -> Result<String, Box<dyn Error + S
     }
 
     Err(format!("picture_id {} の画像が見つかりません", picture_id).into())
+}
+
+/// 外部サイトのセッションを維持するために、定期的にGETリクエストを送信するタスク
+pub async fn keep_session_alive() -> Result<(), Box<dyn Error + Send + Sync>> {
+    // 0.5日 (12時間) の間隔
+    let interval = Duration::from_secs(12 * 60 * 60);
+
+    // 環境変数から必要な情報を取得（タスク起動時に失敗させる）
+    let base_url = env::var("FEEDER_ROOM_URL").expect("FEEDER_ROOM_URL must be set");
+    let cookie = env::var("FEEDER_COOKIE").expect("FEEDER_COOKIE must be set");
+    let url = format!("{}settings/manage_pictures.php", base_url);
+    let client = Client::new();
+
+    loop {
+        // リクエストの送信
+        match client
+            .get(&url)
+            .header("Cookie", &cookie) // &cookie を使用してクローンを避ける
+            .send()
+            .await
+        {
+            Ok(resp) => {
+                // 成功時はステータスコードをチェック (200 OK であればセッションは維持されている可能性が高い)
+                if resp.status().is_success() {
+                    println!("✅ Session keep-alive successful at: {}", url);
+                } else {
+                    eprintln!(
+                        "⚠️ Session keep-alive failed with status: {} at {}",
+                        resp.status(),
+                        url
+                    );
+                }
+            }
+            Err(e) => {
+                // ネットワークエラーなどが発生した場合
+                eprintln!("❌ Session keep-alive request error: {}", e);
+            }
+        }
+
+        // 次のリクエストまで待機
+        time::sleep(interval).await;
+    }
 }
