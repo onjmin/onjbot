@@ -1,6 +1,7 @@
 use crate::commands::{
-    ai::handle_slash_ai, image_gen::handle_slash_image_gen, rss::handle_slash_rss,
-    rss_random::handle_slash_rss_random, unj_deny_all::handle_slash_unj_deny_all,
+    ai::handle_slash_ai, clean::handle_slash_clean, image_gen::handle_slash_image_gen,
+    rss::handle_slash_rss, rss_random::handle_slash_rss_random,
+    unj_deny_all::handle_slash_unj_deny_all,
 };
 use crate::webhook;
 use once_cell::sync::Lazy;
@@ -62,6 +63,9 @@ impl EventHandler for Handler {
                 "unj-deny-all" => {
                     handle_slash_unj_deny_all(&ctx, &command).await;
                 }
+                "clean" => {
+                    handle_slash_clean(&ctx, &command).await;
+                }
                 _ => {}
             }
         }
@@ -117,7 +121,7 @@ impl EventHandler for Handler {
             CreateCommand::new("zenres")
                 .description("全てのメッセージに反応するモードに切り替えます"),
             CreateCommand::new("unj-deny-all")
-                .description("うんJのカキコを遮断します")
+                .description("うんJのカキコを遮断します (モデレーター専用)")
                 .add_option(
                     CreateCommandOption::new(
                         CommandOptionType::Boolean,
@@ -125,6 +129,20 @@ impl EventHandler for Handler {
                         "true で有効化, false で無効化。未指定なら現在の状態を返す",
                     )
                     .required(false),
+                ),
+            CreateCommand::new("clean")
+                .description(
+                    "同じ内容のメッセージを連続で投稿したものを削除します (モデレーター専用)",
+                )
+                .add_option(
+                    CreateCommandOption::new(
+                        CommandOptionType::Integer, // 引数型を Integer に
+                        "limit",                    // 引数名
+                        "遡るメッセージの数 (最大100)",
+                    )
+                    .min_int_value(2) // 2件以上
+                    .max_int_value(100) // 最大100件
+                    .required(true), // 必須引数
                 ),
         ];
 
