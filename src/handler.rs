@@ -1,13 +1,14 @@
 use crate::commands::{
-    ai::handle_slash_ai, clean::handle_slash_clean, image_gen::handle_slash_image_gen,
-    rss::handle_slash_rss, rss_random::handle_slash_rss_random,
-    unj_deny_all::handle_slash_unj_deny_all,
+    ai::handle_slash_ai, clean::handle_slash_clean, dtm_share::handle_slash_dtm_share,
+    image_gen::handle_slash_image_gen, rss::handle_slash_rss,
+    rss_random::handle_slash_rss_random, unj_deny_all::handle_slash_unj_deny_all,
 };
 use crate::webhook;
 use once_cell::sync::Lazy;
 use once_cell::sync::OnceCell;
 use serenity::builder::{CreateInteractionResponse, CreateInteractionResponseMessage};
 use serenity::model::id::ChannelId;
+use serenity::model::id::GuildId;
 use serenity::model::id::UserId;
 use serenity::{
     all::{
@@ -16,14 +17,15 @@ use serenity::{
     },
     async_trait,
 };
-use std::sync::Mutex;
+
+use dashmap::DashMap;
 
 // Handler構造体を修正
 pub struct Handler {
     pub target_channel_id: ChannelId,
 }
 
-static ZENRES_STATE: Lazy<Mutex<bool>> = Lazy::new(|| Mutex::new(false));
+static ZENRES_STATE: Lazy<DashMap<GuildId, bool>> = Lazy::new(DashMap::new);
 static BOT_USER_ID: OnceCell<UserId> = OnceCell::new();
 
 #[async_trait]
@@ -48,10 +50,12 @@ impl EventHandler for Handler {
                     handle_slash_image_gen(&ctx, &command).await;
                 }
                 "zenres" => {
-                    let status = {
-                        let mut state = ZENRES_STATE.lock().unwrap();
-                        *state = !*state;
-                        if *state { "ON" } else { "OFF" }.to_string()
+                    let status = if let Some(guild_id) = command.guild_id {
+                        let mut entry = ZENRES_STATE.entry(guild_id).or_insert(false);
+                        *entry = !*entry;
+                        if *entry { "ON" } else { "OFF" }.to_string()
+                    } else {
+                        "サーバー内でのみ使用可能です".to_string()
                     };
 
                     let builder = CreateInteractionResponse::Message(
@@ -66,6 +70,9 @@ impl EventHandler for Handler {
                 "clean" => {
                     handle_slash_clean(&ctx, &command).await;
                 }
+                "dtm-share" => {
+                    handle_slash_dtm_share(&ctx, &command).await;
+                }
                 _ => {}
             }
         }
@@ -79,8 +86,11 @@ impl EventHandler for Handler {
             }
         }
 
-        // 全レスモード
-        let zenres = *ZENRES_STATE.lock().unwrap();
+        // 全レスモード (サーバー単位)
+        let zenres = msg
+            .guild_id
+            .and_then(|guild_id| ZENRES_STATE.get(&guild_id).map(|r| *r))
+            .unwrap_or(false);
 
         if zenres {
             let content = msg
@@ -143,6 +153,16 @@ impl EventHandler for Handler {
                     .min_int_value(2) // 2件以上
                     .max_int_value(100) // 最大100件
                     .required(true), // 必須引数
+                ),
+            CreateCommand::new("dtm-share")
+                .description("DTMで作った曲をDiscord Activityで共有します")
+                .add_option(
+                    CreateCommandOption::new(
+                        CommandOptionType::String,
+                        "code",
+                        "DTMエディタの「🎮 DISCORD」ボタンでコピーした共有コード",
+                    )
+                    .required(true),
                 ),
         ];
 
